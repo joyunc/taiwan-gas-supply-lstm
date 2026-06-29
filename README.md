@@ -77,8 +77,10 @@
 
 ```
 .
-├── 天然氣供給_LSTM_portfolio.ipynb   # 主要分析 Notebook（含 EDA、建模、評估）
-├── 天然氣供給月資料.csv                           # 原始資料（經濟部能源署）
+├── 天然氣供給_LSTM_portfolio.ipynb   # 主要分析 Notebook（含 EDA、建模、評估、模型匯出）
+├── 天然氣供給月資料.csv               # 原始資料（經濟部能源署）
+├── app.py                            # FastAPI 預測服務
+├── requirements.txt                  # 套件需求
 └── README.md
 ```
 
@@ -87,10 +89,44 @@
 ## 環境需求
 
 ```bash
-pip install numpy pandas matplotlib scikit-learn keras tensorflow statsmodels
+pip install -r requirements.txt
 ```
 
 Notebook 以 Google Colab 開發，本機執行時將 `天然氣供給月資料.csv` 放置於同目錄，並移除 `drive.mount()` 相關程式碼即可。隨機種子已固定為 `SEED=42`，結果可重現。
+
+---
+
+## 預測 API
+
+執行完 Notebook 的 **Section 8（模型匯出）** 後，會產生 `model_lstm.keras` 與 `scaler.pkl`，即可啟動 API：
+
+```bash
+uvicorn app:app --reload
+```
+
+### 端點
+
+`POST /predict`
+
+```json
+{
+  "supply_history": [1200000, 1150000, 980000, 1050000, 1100000, 1300000,
+                     1250000, 1180000, 1020000, 1080000, 1130000, 1320000],
+  "target_month": "2024-01"
+}
+```
+
+回傳：
+
+```json
+{
+  "predicted_supply": 1123456.0,
+  "unit": "千立方公尺",
+  "target_month": "2024-01"
+}
+```
+
+互動式文件請至 `http://localhost:8000/docs`
 
 ---
 
