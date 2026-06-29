@@ -3,7 +3,8 @@ pandas
 matplotlib
 scikit-learn
 keras
-tensorflow
+tensorflow-cpu
 statsmodels
 fastapi
 uvicorn[standard]
+python-dateutil
