@@ -1,3 +1,5 @@
+from typing import Optional
+
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, field_validator
 from datetime import datetime
@@ -103,6 +105,14 @@ def _predict(target_month_str: str) -> tuple[float, str]:
     return round(pred, 0), "historical_data"
 
 
+def _actual_and_error(target_month_str: str, pred: float, source: str) -> tuple[Optional[float], Optional[float]]:
+    """若目標月份在資料集內（historical_data），回傳真實值與 APE（絕對百分比誤差）。"""
+    if source != "historical_data":
+        return None, None
+    actual = real_data[target_month_str]
+    return actual, round(abs(pred - actual) / actual * 100, 2)
+
+
 # ---------- Schema ----------
 
 def _validate_month(v: str) -> str:
@@ -127,6 +137,8 @@ class PredictResponse(BaseModel):
     predicted_supply: float
     unit: str
     data_source: str
+    actual_supply: Optional[float] = None
+    error_pct: Optional[float] = None
 
 
 class MultiPredictRequest(BaseModel):
@@ -148,6 +160,7 @@ class MultiPredictRequest(BaseModel):
 
 class MultiPredictResponse(BaseModel):
     predictions: list[PredictResponse]
+    batch_mape: Optional[float] = None
     note: str
 
 
@@ -168,11 +181,14 @@ def predict(req: PredictRequest):
     超出資料集範圍的月份會自動遞迴預測中間各月。
     """
     pred, source = _predict(req.target_month)
+    actual, error_pct = _actual_and_error(req.target_month, pred, source)
     return PredictResponse(
         target_month=req.target_month,
         predicted_supply=pred,
         unit="千立方公尺",
         data_source=source,
+        actual_supply=actual,
+        error_pct=error_pct,
     )
 
 
@@ -212,15 +228,23 @@ def predict_multi(req: MultiPredictRequest):
             pred = round(float(scaler.inverse_transform([[pred_scaled]])[0][0]), 0)
             source = "historical_data"
 
+        actual, error_pct = _actual_and_error(current.strftime("%Y-%m"), pred, source)
         results.append(PredictResponse(
             target_month=current.strftime("%Y-%m"),
             predicted_supply=pred,
             unit="千立方公尺",
             data_source=source,
+            actual_supply=actual,
+            error_pct=error_pct,
         ))
         current += relativedelta(months=1)
 
+    errors = [r.error_pct for r in results if r.error_pct is not None]
+    batch_mape = round(sum(errors) / len(errors), 2) if errors else None
+
     return MultiPredictResponse(
         predictions=results,
-        note="data_source='recursive_prediction' 表示超出資料集範圍，誤差會隨步數累積",
+        batch_mape=batch_mape,
+        note="data_source='recursive_prediction' 表示超出資料集範圍，誤差會隨步數累積；"
+             "batch_mape 僅根據落在資料集內（historical_data）的月份計算",
     )
