@@ -104,14 +104,14 @@ Notebook 以 Google Colab 開發，本機執行時將 `天然氣供給月資料.
 uvicorn app:app --reload
 ```
 
+API 啟動時會自動讀取 `天然氣供給月資料.csv` 建立月份查詢表，呼叫端不需再手動傳入歷史資料；只要指定目標月份，超出資料集範圍的月份會自動遞迴預測中間各月。
+
 ### 端點
 
-`POST /predict`
+`POST /predict`：單月預測
 
 ```json
 {
-  "supply_history": [1200000, 1150000, 980000, 1050000, 1100000, 1300000,
-                     1250000, 1180000, 1020000, 1080000, 1130000, 1320000],
   "target_month": "2024-01"
 }
 ```
@@ -120,13 +120,27 @@ uvicorn app:app --reload
 
 ```json
 {
+  "target_month": "2024-01",
   "predicted_supply": 1123456.0,
   "unit": "千立方公尺",
-  "target_month": "2024-01"
+  "data_source": "recursive_prediction"
 }
 ```
 
-互動式文件請至 `http://localhost:8000/docs`
+`data_source` 為 `historical_data` 表示目標月份在資料集範圍內（可用來驗證模型），`recursive_prediction` 表示超出範圍、由遞迴預測產生。
+
+`POST /predict/multi`：多月連續預測
+
+```json
+{
+  "start_month": "2024-01",
+  "steps": 6
+}
+```
+
+回傳 `predictions` 陣列（每筆格式同 `/predict` 回傳），`steps` 上限為 36，建議 ≤ 6 以避免遞迴誤差累積過大。
+
+互動式文件（Swagger UI）請至 `http://localhost:8000/docs`
 
 ---
 
